@@ -113,7 +113,9 @@ public class JavaToolClient {
             Files.readAllLines(configurationFile).forEach(
                     line -> {
                         var separator = line.indexOf('=');
-                        configurationMap.put(line.substring(0, separator), line.substring(separator + 1));
+                        var key = line.substring(0, separator).strip();
+                        var value = line.substring(separator + 1).strip();
+                        configurationMap.put(key, value);
                     }
             );
             var portfile = Path.of(configurationMap.get("portfile"));
