@@ -23,7 +23,7 @@
  * questions.
  */
 
-package com.sun.tools.sjavac;
+package javatoolportal;
 
 import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
