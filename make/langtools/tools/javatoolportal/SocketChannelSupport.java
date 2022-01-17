@@ -30,6 +30,9 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Static helpers reading from and writing onto a {@link SocketChannel}.
+ */
 class SocketChannelSupport {
 
     static int readInt(SocketChannel channel) throws Exception {

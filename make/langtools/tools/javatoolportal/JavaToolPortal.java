@@ -30,7 +30,6 @@ import java.io.StringWriter;
 import java.net.BindException;
 import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -41,11 +40,10 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.spi.ToolProvider;
 
-public class JavaToolPortal implements ToolProvider {
+class JavaToolPortal {
 
     public static void main(String... args) {
         var portal = new JavaToolPortal();
@@ -54,12 +52,6 @@ public class JavaToolPortal implements ToolProvider {
         System.exit(portal.run(out, err, args));
     }
 
-    @Override
-    public String name() {
-        return "java-tool-portal";
-    }
-
-    @Override
     public int run(PrintWriter out, PrintWriter err, String... args) {
         out.println("Portal started in directory: " + Path.of("").toAbsolutePath());
         if (args.length != 1) {
@@ -72,6 +64,7 @@ public class JavaToolPortal implements ToolProvider {
             try {
                 var server = new Server(out, err, socketAddress);
                 var serverSocketChannel = server.bind();
+                Files.deleteIfExists(socketPath.resolveSibling("server.port.starting"));
                 out.println("Portal bound to socket path: " + socketAddress);
                 new Thread(new Stopper(serverSocketChannel, socketPath.getParent())).start();
                 Runtime.getRuntime()
