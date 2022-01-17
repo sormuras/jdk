@@ -243,7 +243,8 @@ define SetupJavaCompilationBody
 
       # Always use small java to launch client
       $1_JAVAC_CMD := $$(JAVA_SMALL) $$($1_JAVA_FLAGS) $$($1_JAVAC) \
-          --server:conf=$$($1_JAVAC_SERVER_CONFIG)
+          --server:conf=$$($1_JAVAC_SERVER_CONFIG) \
+          javac
     else
       # No javac server
       $1_JAVAC := $$(INTERIM_LANGTOOLS_ARGS) -m jdk.compiler.interim/com.sun.tools.javac.Main

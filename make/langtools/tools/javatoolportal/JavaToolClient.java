@@ -47,12 +47,8 @@ record JavaToolClient(Configuration configuration) {
         try (var channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
             var connected = channel.connect(socketAddress);
             if (!connected) throw new RuntimeException("Connect failed: " + socketAddress);
-            // Prepare arguments
-            var arguments = new ArrayList<String>();
-            arguments.add("javac");
-            arguments.addAll(List.of(configuration.args()));
             // Send arguments
-            SocketChannelSupport.writeStrings(channel, arguments);
+            SocketChannelSupport.writeStrings(channel, List.of(configuration.args()));
             // Read status code
             var status = SocketChannelSupport.readInt(channel);
             // Read strings
