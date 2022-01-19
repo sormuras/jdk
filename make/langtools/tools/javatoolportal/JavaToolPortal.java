@@ -134,15 +134,24 @@ class JavaToolPortal {
 
         void serve(ServerSocketChannel serverSocketChannel) throws Exception {
             int counter = 0;
+            int timeouts = 0;
             try {
+                serverSocketChannel.socket().setSoTimeout(60 * 1000);
                 while (serverSocketChannel.isOpen()) {
-                    var channel = serverSocketChannel.accept();
-                    counter++;
-                    new Thread(new Handler(out, err, channel)).start();
+                    try {
+                        var channel = serverSocketChannel.accept();
+                        counter++;
+                        timeouts = 0;
+                        new Thread(new Handler(out, err, channel)).start();
+                    } catch (SocketTimeoutException timeout) {
+                        timeouts++;
+                        if (timeouts >= 3) serverSocketChannel.close();
+                    }
                 }
             } catch (AsynchronousCloseException exception) {
-                out.printf("Portal closed after handling %d request(s)%n", counter);
+                // fall-through
             }
+            out.printf("Portal closed after handling %d request(s)%n", counter);
         }
     }
 
