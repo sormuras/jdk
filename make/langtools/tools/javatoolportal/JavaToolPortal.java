@@ -27,9 +27,7 @@ package javatoolportal;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.net.BindException;
-import java.net.StandardProtocolFamily;
-import java.net.UnixDomainSocketAddress;
+import java.net.*;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -60,10 +58,12 @@ class JavaToolPortal {
         }
         try {
             var socketPath = Path.of(args[0]).toAbsolutePath();
-            var socketAddress = UnixDomainSocketAddress.of(socketPath);
+            var localhost = InetAddress.getByName(null);
+            var socketAddress = new InetSocketAddress(localhost, 53332);
             try {
                 var server = new Server(out, err, socketAddress);
                 var serverSocketChannel = server.bind();
+                Files.createFile(socketPath);
                 Files.deleteIfExists(socketPath.resolveSibling("server.port.starting"));
                 out.println("Portal bound to socket path: " + socketAddress);
                 new Thread(new Stopper(serverSocketChannel, socketPath.getParent())).start();
@@ -74,6 +74,8 @@ class JavaToolPortal {
             } catch (BindException exception) {
                 err.println(exception);
                 return 2;
+            } finally {
+                Files.deleteIfExists(socketPath);
             }
         } catch (Exception exception) {
             exception.printStackTrace(err);
@@ -122,10 +124,10 @@ class JavaToolPortal {
         }
     }
 
-    record Server(PrintWriter out, PrintWriter err, UnixDomainSocketAddress socketAddress) {
+    record Server(PrintWriter out, PrintWriter err, SocketAddress socketAddress) {
 
         ServerSocketChannel bind() throws Exception {
-            var serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
+            var serverChannel = ServerSocketChannel.open();
             serverChannel.bind(socketAddress);
             return serverChannel;
         }
@@ -140,8 +142,6 @@ class JavaToolPortal {
                 }
             } catch (AsynchronousCloseException exception) {
                 out.printf("Portal closed after handling %d request(s)%n", counter);
-            } finally {
-                Files.deleteIfExists(socketAddress.getPath());
             }
         }
     }

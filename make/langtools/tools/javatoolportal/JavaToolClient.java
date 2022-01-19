@@ -25,8 +25,8 @@
 
 package javatoolportal;
 
-import java.net.StandardProtocolFamily;
-import java.net.UnixDomainSocketAddress;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -41,10 +41,10 @@ record JavaToolClient(Configuration configuration) {
         var out = System.out;
         var err = System.err;
 
-        var socketPath = configuration.portfile();
-        var socketAddress = UnixDomainSocketAddress.of(socketPath);
+        var localhost = InetAddress.getByName(null);
+        var socketAddress = new InetSocketAddress(localhost, 53332);
 
-        try (var channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
+        try (var channel = SocketChannel.open()) {
             var connected = channel.connect(socketAddress);
             if (!connected) throw new RuntimeException("Connect failed: " + socketAddress);
             // Send arguments
