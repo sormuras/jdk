@@ -70,8 +70,7 @@ record JavaToolClient(Configuration configuration) {
             var command = new ArrayList<>(configuration.servercmd());
             command.add(configuration.arg0());
             var builder = new ProcessBuilder(command)
-                    .redirectErrorStream(true)
-                    .redirectOutput(portfile.resolveSibling("server.port.txt").toFile());
+                    .redirectErrorStream(true);
             var process = builder.start();
             System.out.println("Starting Java Tool Portal...");
             Thread.sleep(1234);
