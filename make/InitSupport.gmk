@@ -505,6 +505,8 @@ else # $(HAS_SPEC)=true
   endef
 
   define CleanupSmartJavac
+    $(ECHO) CleanupSmartJavac
+    ls $(JAVAC_SERVER_DIR)
 	[ -f $(JAVAC_SERVER_DIR)/server.port ] && $(ECHO) Stopping sjavac server && \
 	    $(TOUCH) $(JAVAC_SERVER_DIR)/server.port.stop; true
   endef
