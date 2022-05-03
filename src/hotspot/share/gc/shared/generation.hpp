@@ -41,8 +41,7 @@
 //
 // Generation                      - abstract base class
 // - DefNewGeneration              - allocation area (copy collected)
-// - CardGeneration                 - abstract class adding offset array behavior
-//   - TenuredGeneration             - tenured (old object) space (markSweepCompact)
+// - TenuredGeneration             - tenured (old object) space (markSweepCompact)
 //
 // The system configuration currently allowed is:
 //
@@ -363,10 +362,6 @@ class Generation: public CHeapObj<mtGC> {
   virtual void compact();
   virtual void post_compact() { ShouldNotReachHere(); }
 #endif
-
-  // Some generations may require some cleanup actions before allowing
-  // a verification.
-  virtual void prepare_for_verify() {}
 
   // Accessing "marks".
 

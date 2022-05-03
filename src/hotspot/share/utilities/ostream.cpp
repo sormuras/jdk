@@ -746,7 +746,7 @@ void defaultStream::start_log() {
       outputStream *text = xs->text();
       for (SystemProperty* p = Arguments::system_properties(); p != NULL; p = p->next()) {
         assert(p->key() != NULL, "p->key() is NULL");
-        if (p->is_readable()) {
+        if (p->readable()) {
           // Print in two stages to avoid problems with long
           // keys/values.
           text->print_raw(p->key());
@@ -1079,7 +1079,7 @@ networkStream::networkStream() : bufferedStream(1024*10, 1024*10) {
 
   _socket = -1;
 
-  int result = os::socket(AF_INET, SOCK_STREAM, 0);
+  int result = ::socket(AF_INET, SOCK_STREAM, 0);
   if (result <= 0) {
     assert(false, "Socket could not be created!");
   } else {

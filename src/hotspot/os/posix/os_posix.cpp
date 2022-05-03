@@ -53,6 +53,7 @@
 #include <dirent.h>
 #include <dlfcn.h>
 #include <grp.h>
+#include <locale.h>
 #include <netdb.h>
 #include <pwd.h>
 #include <pthread.h>
@@ -548,6 +549,33 @@ void os::Posix::print_user_info(outputStream* st) {
   st->cr();
 }
 
+// Print all active locale categories, one line each
+void os::Posix::print_active_locale(outputStream* st) {
+  st->print_cr("Active Locale:");
+  // Posix is quiet about how exactly LC_ALL is implemented.
+  // Just print it out too, in case LC_ALL is held separately
+  // from the individual categories.
+  #define LOCALE_CAT_DO(f) \
+    f(LC_ALL) \
+    f(LC_COLLATE) \
+    f(LC_CTYPE) \
+    f(LC_MESSAGES) \
+    f(LC_MONETARY) \
+    f(LC_NUMERIC) \
+    f(LC_TIME)
+  #define XX(cat) { cat, #cat },
+  const struct { int c; const char* name; } categories[] = {
+      LOCALE_CAT_DO(XX)
+      { -1, NULL }
+  };
+  #undef XX
+  #undef LOCALE_CAT_DO
+  for (int i = 0; categories[i].c != -1; i ++) {
+    const char* locale = setlocale(categories[i].c, NULL);
+    st->print_cr("%s=%s", categories[i].name,
+                 ((locale != NULL) ? locale : "<unknown>"));
+  }
+}
 
 bool os::get_host_name(char* buf, size_t buflen) {
   struct utsname name;
@@ -663,10 +691,6 @@ jlong os::lseek(int fd, jlong offset, int whence) {
   return (jlong) BSD_ONLY(::lseek) NOT_BSD(::lseek64)(fd, offset, whence);
 }
 
-int os::fsync(int fd) {
-  return ::fsync(fd);
-}
-
 int os::ftruncate(int fd, jlong length) {
    return BSD_ONLY(::ftruncate) NOT_BSD(::ftruncate64)(fd, length);
 }
@@ -687,10 +711,6 @@ ssize_t os::write(int fd, const void *buf, unsigned int nBytes) {
 
 ssize_t os::read_at(int fd, void *buf, unsigned int nBytes, jlong offset) {
   return ::pread(fd, buf, nBytes, offset);
-}
-
-int os::close(int fd) {
-  return ::close(fd);
 }
 
 void os::flockfile(FILE* fp) {
@@ -718,10 +738,6 @@ int os::closedir(DIR *dirp) {
 
 int os::socket_close(int fd) {
   return ::close(fd);
-}
-
-int os::socket(int domain, int type, int protocol) {
-  return ::socket(domain, type, protocol);
 }
 
 int os::recv(int fd, char* buf, size_t nBytes, uint flags) {
@@ -1100,7 +1116,7 @@ bool os::Posix::handle_stack_overflow(JavaThread* thread, address addr, address 
         }
       }
 #endif // ARM
-      // Throw a stack overflow exception.  Guard pages will be reenabled
+      // Throw a stack overflow exception.  Guard pages will be re-enabled
       // while unwinding the stack.
       overflow_state->disable_stack_yellow_reserved_zone();
       *stub = SharedRuntime::continuation_for_implicit_exception(thread, pc, SharedRuntime::STACK_OVERFLOW);

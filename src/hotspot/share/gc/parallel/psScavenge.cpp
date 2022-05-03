@@ -162,13 +162,15 @@ public:
   }
 
   template <class T> void do_oop_work(T* p) {
-    assert (oopDesc::is_oop(RawAccess<IS_NOT_NULL>::oop_load(p)),
-            "expected an oop while scanning weak refs");
+#ifdef ASSERT
+    // Referent must be non-null and in from-space
+    oop obj = RawAccess<IS_NOT_NULL>::oop_load(p);
+    assert(oopDesc::is_oop(obj), "referent must be an oop");
+    assert(PSScavenge::is_obj_in_young(obj), "must be in young-gen");
+    assert(!PSScavenge::is_obj_in_to_space(obj), "must be in from-space");
+#endif
 
-    // Weak refs may be visited more than once.
-    if (PSScavenge::should_scavenge(p, _to_space)) {
-      _promotion_manager->copy_and_push_safe_barrier</*promote_immediately=*/false>(p);
-    }
+    _promotion_manager->copy_and_push_safe_barrier</*promote_immediately=*/false>(p);
   }
   virtual void do_oop(oop* p)       { PSKeepAliveClosure::do_oop_work(p); }
   virtual void do_oop(narrowOop* p) { PSKeepAliveClosure::do_oop_work(p); }
@@ -358,12 +360,6 @@ bool PSScavenge::invoke_no_policy() {
 
   _gc_timer.register_gc_start();
 
-  TimeStamp scavenge_entry;
-  TimeStamp scavenge_midpoint;
-  TimeStamp scavenge_exit;
-
-  scavenge_entry.update();
-
   if (GCLocker::check_active_before_gc()) {
     return false;
   }
@@ -462,8 +458,6 @@ bool PSScavenge::invoke_no_policy() {
       ScavengeRootsTask task(old_gen, active_workers);
       ParallelScavengeHeap::heap()->workers().run_task(&task);
     }
-
-    scavenge_midpoint.update();
 
     // Process reference objects discovered during scavenge
     {
@@ -669,12 +663,6 @@ bool PSScavenge::invoke_no_policy() {
   heap->print_heap_after_gc();
   heap->trace_heap_after_gc(&_gc_tracer);
 
-  scavenge_exit.update();
-
-  log_debug(gc, task, time)("VM-Thread " JLONG_FORMAT " " JLONG_FORMAT " " JLONG_FORMAT,
-                            scavenge_entry.ticks(), scavenge_midpoint.ticks(),
-                            scavenge_exit.ticks());
-
   AdaptiveSizePolicyOutput::print(size_policy, heap->total_collections());
 
   _gc_timer.register_gc_end();
@@ -684,19 +672,11 @@ bool PSScavenge::invoke_no_policy() {
   return !promotion_failure_occurred;
 }
 
-// This method iterates over all objects in the young generation,
-// removing all forwarding references. It then restores any preserved marks.
 void PSScavenge::clean_up_failed_promotion() {
-  ParallelScavengeHeap* heap = ParallelScavengeHeap::heap();
-  PSYoungGen* young_gen = heap->young_gen();
-
-  RemoveForwardedPointerClosure remove_fwd_ptr_closure;
-  young_gen->object_iterate(&remove_fwd_ptr_closure);
-
   PSPromotionManager::restore_preserved_marks();
 
   // Reset the PromotionFailureALot counters.
-  NOT_PRODUCT(heap->reset_promotion_should_fail();)
+  NOT_PRODUCT(ParallelScavengeHeap::heap()->reset_promotion_should_fail();)
 }
 
 bool PSScavenge::should_attempt_scavenge() {
@@ -780,7 +760,7 @@ void PSScavenge::initialize() {
                            ParallelGCThreads,          // mt processing degree
                            ParallelGCThreads,          // mt discovery degree
                            false,                      // concurrent_discovery
-                           NULL);                      // header provides liveness info
+                           &_is_alive_closure);        // header provides liveness info
 
   // Cache the cardtable
   _card_table = heap->card_table();
