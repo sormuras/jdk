@@ -68,6 +68,7 @@ import jdk.internal.module.ModuleInfo;
 import jdk.internal.module.ModuleInfoExtender;
 import jdk.internal.module.ModuleResolution;
 import jdk.internal.module.ModuleTarget;
+import jdk.internal.util.CommandLineSupport;
 import jdk.internal.util.jar.JarIndex;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -497,7 +498,7 @@ public class Main {
     boolean parseArgs(String args[]) {
         /* Preprocess and expand @file arguments */
         try {
-            args = CommandLine.parse(args);
+            args = CommandLineSupport.parse(args);
         } catch (FileNotFoundException e) {
             fatalError(formatMsg("error.cant.open", e.getMessage()));
             return false;

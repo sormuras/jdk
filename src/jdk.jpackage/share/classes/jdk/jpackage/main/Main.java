@@ -25,6 +25,7 @@
 
 package jdk.jpackage.main;
 
+import jdk.internal.util.CommandLineSupport;
 import jdk.jpackage.internal.Arguments;
 import jdk.jpackage.internal.Log;
 import jdk.jpackage.internal.CLIHelp;
@@ -67,7 +68,7 @@ public class Main {
         try {
             String[] newArgs;
             try {
-                newArgs = CommandLine.parse(args);
+                newArgs = CommandLineSupport.parse(args);
             } catch (FileNotFoundException fnfe) {
                 Log.fatalError(MessageFormat.format(I18N.getString(
                         "ERR_CannotParseOptions"), fnfe.getMessage()));
