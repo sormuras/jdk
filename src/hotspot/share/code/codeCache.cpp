@@ -35,6 +35,7 @@
 #include "code/pcDesc.hpp"
 #include "compiler/compilationPolicy.hpp"
 #include "compiler/compileBroker.hpp"
+#include "compiler/compilerDefinitions.inline.hpp"
 #include "compiler/oopMap.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "gc/shared/collectedHeap.hpp"
@@ -57,6 +58,7 @@
 #include "runtime/icache.hpp"
 #include "runtime/java.hpp"
 #include "runtime/mutexLocker.hpp"
+#include "runtime/os.inline.hpp"
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/sweeper.hpp"
 #include "runtime/vmThread.hpp"
@@ -172,10 +174,10 @@ int CodeCache::Sweep::_compiled_method_iterators = 0;
 bool CodeCache::Sweep::_pending_sweep = false;
 
 // Initialize arrays of CodeHeap subsets
-GrowableArray<CodeHeap*>* CodeCache::_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
-GrowableArray<CodeHeap*>* CodeCache::_compiled_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
-GrowableArray<CodeHeap*>* CodeCache::_nmethod_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
-GrowableArray<CodeHeap*>* CodeCache::_allocable_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
+GrowableArray<CodeHeap*>* CodeCache::_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (static_cast<int>(CodeBlobType::All), mtCode);
+GrowableArray<CodeHeap*>* CodeCache::_compiled_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (static_cast<int>(CodeBlobType::All), mtCode);
+GrowableArray<CodeHeap*>* CodeCache::_nmethod_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (static_cast<int>(CodeBlobType::All), mtCode);
+GrowableArray<CodeHeap*>* CodeCache::_allocable_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (static_cast<int>(CodeBlobType::All), mtCode);
 
 void CodeCache::check_heap_sizes(size_t non_nmethod_size, size_t profiled_size, size_t non_profiled_size, size_t cache_size, bool all_set) {
   size_t total_size = non_nmethod_size + profiled_size + non_profiled_size;
@@ -369,7 +371,7 @@ ReservedCodeSpace CodeCache::reserve_heap_memory(size_t size) {
 }
 
 // Heaps available for allocation
-bool CodeCache::heap_available(int code_blob_type) {
+bool CodeCache::heap_available(CodeBlobType code_blob_type) {
   if (!SegmentedCodeCache) {
     // No segmentation: use a single code heap
     return (code_blob_type == CodeBlobType::All);
@@ -386,7 +388,7 @@ bool CodeCache::heap_available(int code_blob_type) {
   }
 }
 
-const char* CodeCache::get_code_heap_flag_name(int code_blob_type) {
+const char* CodeCache::get_code_heap_flag_name(CodeBlobType code_blob_type) {
   switch(code_blob_type) {
   case CodeBlobType::NonNMethod:
     return "NonNMethodCodeHeapSize";
@@ -397,16 +399,17 @@ const char* CodeCache::get_code_heap_flag_name(int code_blob_type) {
   case CodeBlobType::MethodProfiled:
     return "ProfiledCodeHeapSize";
     break;
+  default:
+    ShouldNotReachHere();
+    return NULL;
   }
-  ShouldNotReachHere();
-  return NULL;
 }
 
 int CodeCache::code_heap_compare(CodeHeap* const &lhs, CodeHeap* const &rhs) {
   if (lhs->code_blob_type() == rhs->code_blob_type()) {
     return (lhs > rhs) ? 1 : ((lhs < rhs) ? -1 : 0);
   } else {
-    return lhs->code_blob_type() - rhs->code_blob_type();
+    return static_cast<int>(lhs->code_blob_type()) - static_cast<int>(rhs->code_blob_type());
   }
 }
 
@@ -415,7 +418,7 @@ void CodeCache::add_heap(CodeHeap* heap) {
 
   _heaps->insert_sorted<code_heap_compare>(heap);
 
-  int type = heap->code_blob_type();
+  CodeBlobType type = heap->code_blob_type();
   if (code_blob_type_accepts_compiled(type)) {
     _compiled_heaps->insert_sorted<code_heap_compare>(heap);
   }
@@ -427,7 +430,7 @@ void CodeCache::add_heap(CodeHeap* heap) {
   }
 }
 
-void CodeCache::add_heap(ReservedSpace rs, const char* name, int code_blob_type) {
+void CodeCache::add_heap(ReservedSpace rs, const char* name, CodeBlobType code_blob_type) {
   // Check if heap is needed
   if (!heap_available(code_blob_type)) {
     return;
@@ -469,7 +472,7 @@ CodeHeap* CodeCache::get_code_heap(const CodeBlob* cb) {
   return NULL;
 }
 
-CodeHeap* CodeCache::get_code_heap(int code_blob_type) {
+CodeHeap* CodeCache::get_code_heap(CodeBlobType code_blob_type) {
   FOR_ALL_HEAPS(heap) {
     if ((*heap)->accepts(code_blob_type)) {
       return *heap;
@@ -518,7 +521,7 @@ CodeBlob* CodeCache::first_blob(CodeHeap* heap) {
   return (CodeBlob*)heap->first();
 }
 
-CodeBlob* CodeCache::first_blob(int code_blob_type) {
+CodeBlob* CodeCache::first_blob(CodeBlobType code_blob_type) {
   if (heap_available(code_blob_type)) {
     return first_blob(get_code_heap(code_blob_type));
   } else {
@@ -539,7 +542,7 @@ CodeBlob* CodeCache::next_blob(CodeHeap* heap, CodeBlob* cb) {
  * run the constructor for the CodeBlob subclass he is busy
  * instantiating.
  */
-CodeBlob* CodeCache::allocate(int size, int code_blob_type, bool handle_alloc_failure, int orig_code_blob_type) {
+CodeBlob* CodeCache::allocate(int size, CodeBlobType code_blob_type, bool handle_alloc_failure, CodeBlobType orig_code_blob_type) {
   // Possibly wakes up the sweeper thread.
   NMethodSweeper::report_allocation();
   assert_locked_or_safepoint(CodeCache_lock);
@@ -567,7 +570,7 @@ CodeBlob* CodeCache::allocate(int size, int code_blob_type, bool handle_alloc_fa
         // NonNMethod -> MethodNonProfiled -> MethodProfiled (-> MethodNonProfiled)
         // Note that in the sweeper, we check the reverse_free_ratio of the code heap
         // and force stack scanning if less than 10% of the entire code cache are free.
-        int type = code_blob_type;
+        CodeBlobType type = code_blob_type;
         switch (type) {
         case CodeBlobType::NonNMethod:
           type = CodeBlobType::MethodNonProfiled;
@@ -580,6 +583,8 @@ CodeBlob* CodeCache::allocate(int size, int code_blob_type, bool handle_alloc_fa
           if (type == orig_code_blob_type) {
             type = CodeBlobType::MethodNonProfiled;
           }
+          break;
+        default:
           break;
         }
         if (type != code_blob_type && type != orig_code_blob_type && heap_available(type)) {
@@ -617,12 +622,10 @@ void CodeCache::free(CodeBlob* cb) {
   CodeHeap* heap = get_code_heap(cb);
   print_trace("free", cb);
   if (cb->is_nmethod()) {
-    nmethod* ptr = (nmethod *)cb;
     heap->set_nmethod_count(heap->nmethod_count() - 1);
-    if (ptr->has_dependencies()) {
+    if (((nmethod *)cb)->has_dependencies()) {
       _number_of_nmethods_with_dependencies--;
     }
-    ptr->free_native_invokers();
   }
   if (cb->is_adapter_blob()) {
     heap->set_adapter_count(heap->adapter_count() - 1);
@@ -684,14 +687,23 @@ bool CodeCache::contains(nmethod *nm) {
   return contains((void *)nm);
 }
 
+static bool is_in_asgct() {
+  Thread* current_thread = Thread::current_or_null_safe();
+  return current_thread != NULL && current_thread->is_Java_thread() && JavaThread::cast(current_thread)->in_asgct();
+}
+
 // This method is safe to call without holding the CodeCache_lock, as long as a dead CodeBlob is not
 // looked up (i.e., one that has been marked for deletion). It only depends on the _segmap to contain
 // valid indices, which it will always do, as long as the CodeBlob is not in the process of being recycled.
 CodeBlob* CodeCache::find_blob(void* start) {
   CodeBlob* result = find_blob_unsafe(start);
   // We could potentially look up non_entrant methods
-  guarantee(result == NULL || !result->is_zombie() || result->is_locked_by_vm() || VMError::is_error_reported(), "unsafe access to zombie method");
-  return result;
+  bool is_zombie = result != NULL && result->is_zombie();
+  bool is_result_safe = !is_zombie || result->is_locked_by_vm() || VMError::is_error_reported();
+  guarantee(is_result_safe || is_in_asgct(), "unsafe access to zombie method");
+  // When in ASGCT the previous gurantee will pass for a zombie method but we still don't want that code blob returned in order
+  // to minimize the chance of accessing dead memory
+  return is_result_safe ? result : NULL;
 }
 
 // Lookup that does not fail if you lookup a zombie method (if you call this, be sure to know
@@ -747,9 +759,8 @@ int CodeCache::alignment_offset() {
 }
 
 // Mark nmethods for unloading if they contain otherwise unreachable oops.
-void CodeCache::do_unloading(BoolObjectClosure* is_alive, bool unloading_occurred) {
+void CodeCache::do_unloading(bool unloading_occurred) {
   assert_locked_or_safepoint(CodeCache_lock);
-  UnloadingScope scope(is_alive);
   CompiledMethodIterator iter(CompiledMethodIterator::only_alive);
   while(iter.next()) {
     iter.method()->do_unloading(unloading_occurred);
@@ -865,7 +876,7 @@ void CodeCache::verify_oops() {
   }
 }
 
-int CodeCache::blob_count(int code_blob_type) {
+int CodeCache::blob_count(CodeBlobType code_blob_type) {
   CodeHeap* heap = get_code_heap(code_blob_type);
   return (heap != NULL) ? heap->blob_count() : 0;
 }
@@ -878,7 +889,7 @@ int CodeCache::blob_count() {
   return count;
 }
 
-int CodeCache::nmethod_count(int code_blob_type) {
+int CodeCache::nmethod_count(CodeBlobType code_blob_type) {
   CodeHeap* heap = get_code_heap(code_blob_type);
   return (heap != NULL) ? heap->nmethod_count() : 0;
 }
@@ -891,7 +902,7 @@ int CodeCache::nmethod_count() {
   return count;
 }
 
-int CodeCache::adapter_count(int code_blob_type) {
+int CodeCache::adapter_count(CodeBlobType code_blob_type) {
   CodeHeap* heap = get_code_heap(code_blob_type);
   return (heap != NULL) ? heap->adapter_count() : 0;
 }
@@ -904,12 +915,12 @@ int CodeCache::adapter_count() {
   return count;
 }
 
-address CodeCache::low_bound(int code_blob_type) {
+address CodeCache::low_bound(CodeBlobType code_blob_type) {
   CodeHeap* heap = get_code_heap(code_blob_type);
   return (heap != NULL) ? (address)heap->low_boundary() : NULL;
 }
 
-address CodeCache::high_bound(int code_blob_type) {
+address CodeCache::high_bound(CodeBlobType code_blob_type) {
   CodeHeap* heap = get_code_heap(code_blob_type);
   return (heap != NULL) ? (address)heap->high_boundary() : NULL;
 }
@@ -922,7 +933,7 @@ size_t CodeCache::capacity() {
   return cap;
 }
 
-size_t CodeCache::unallocated_capacity(int code_blob_type) {
+size_t CodeCache::unallocated_capacity(CodeBlobType code_blob_type) {
   CodeHeap* heap = get_code_heap(code_blob_type);
   return (heap != NULL) ? heap->unallocated_capacity() : 0;
 }
@@ -1297,7 +1308,7 @@ void CodeCache::verify() {
 // A CodeHeap is full. Print out warning and report event.
 PRAGMA_DIAG_PUSH
 PRAGMA_FORMAT_NONLITERAL_IGNORED
-void CodeCache::report_codemem_full(int code_blob_type, bool print) {
+void CodeCache::report_codemem_full(CodeBlobType code_blob_type, bool print) {
   // Get nmethod heap for the given CodeBlobType and build CodeCacheFull event
   CodeHeap* heap = get_code_heap(code_blob_type);
   assert(heap != NULL, "heap is null");
@@ -1359,6 +1370,7 @@ void CodeCache::report_codemem_full(int code_blob_type, bool print) {
     event.set_adaptorCount(heap->adapter_count());
     event.set_unallocatedCapacity(heap->unallocated_capacity());
     event.set_fullCount(heap->full_count());
+    event.set_codeCacheMaxCapacity(CodeCache::max_capacity());
     event.commit();
   }
 }

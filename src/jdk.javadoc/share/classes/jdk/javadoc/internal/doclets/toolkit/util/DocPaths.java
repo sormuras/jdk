@@ -94,9 +94,6 @@ public class DocPaths {
     /** The name of the copy-to-clipboard icon file. */
     public static final DocPath CLIPBOARD_SVG = DocPath.create("copy.svg");
 
-    /** The name of the stylesheet file overriding jQuery UI stylesheet. */
-    public static final DocPath JQUERY_OVERRIDES_CSS = DocPath.create("jquery-ui.overrides.css");
-
     /** The name of the default jQuery javascript file. */
     public static final DocPath JQUERY_JS = DocPath.create("jquery-3.6.0.min.js");
 
@@ -105,9 +102,6 @@ public class DocPaths {
 
     /** The name of the default jQuery UI javascript file. */
     public static final DocPath JQUERY_UI_JS = DocPath.create("jquery-ui.min.js");
-
-    /** The name of the jQuery UI stylesheet file containing structural declarations. */
-    public static final DocPath JQUERY_UI_STRUCTURE_CSS = DocPath.create("jquery-ui.structure.min.css");
 
     /** The name of the directory for legal files. */
     public static final DocPath LEGAL = DocPath.create("legal");
