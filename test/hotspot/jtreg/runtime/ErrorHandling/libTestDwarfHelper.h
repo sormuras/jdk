@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,20 +21,25 @@
  * questions.
  */
 
+#include "jni.h"
+#include <stdio.h>
 
-/*
- * @test
- * @key stress randomness
- *
- * @summary converted from VM Testbase gc/lock/jniref/jnireflock02.
- * VM Testbase keywords: [gc, stress, stressopt, nonconcurrent]
- *
- * @library /vmTestbase
- *          /test/lib
- * @run main/othervm/native
- *      -XX:-UseGCOverheadLimit
- *      gc.lock.LockerTest
- *      -gp1 random(primitiveArrays)
- *      -lockers jniRef
- */
+void unused1() {
+}
 
+void unused2() {
+}
+
+void unused3() {
+}
+
+void unused4() {
+}
+
+void unused5() {
+}
+
+void dereference_null() {
+  int* x = (int*)0;
+  *x = 34; // Crash
+}
