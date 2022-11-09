@@ -38,11 +38,15 @@ record JavaToolClient(Configuration configuration) {
     int run() throws Exception {
         ensurePortalIsRunning();
 
+        var portfile = configuration.portfile();
+        if (Files.notExists(portfile)) throw new AssertionError("Port file not found: " + portfile);
+        var port = Integer.parseInt(Files.readString(portfile));
+
         var out = System.out;
         var err = System.err;
 
         var localhost = InetAddress.getByName(null);
-        var socketAddress = new InetSocketAddress(localhost, 53332);
+        var socketAddress = new InetSocketAddress(localhost, port);
 
         try (var channel = SocketChannel.open()) {
             var connected = channel.connect(socketAddress);

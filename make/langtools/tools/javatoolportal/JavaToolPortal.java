@@ -59,13 +59,13 @@ class JavaToolPortal {
         try {
             var socketPath = Path.of(args[0]).toAbsolutePath();
             var localhost = InetAddress.getByName(null);
-            var socketAddress = new InetSocketAddress(localhost, 53332);
+            var socketAddress = new InetSocketAddress(localhost, 0);
             try {
                 var server = new Server(out, err, socketAddress);
                 var serverSocketChannel = server.bind();
-                Files.createFile(socketPath);
+                Files.writeString(socketPath, "" + serverSocketChannel.socket().getLocalPort());
                 Files.deleteIfExists(socketPath.resolveSibling("server.port.starting"));
-                out.println("Portal bound to socket path: " + socketAddress);
+                out.println("Portal bound to: " + serverSocketChannel.socket());
                 new Thread(new Stopper(serverSocketChannel, socketPath.getParent())).start();
                 Runtime.getRuntime()
                         .addShutdownHook(new Thread(new Closer(serverSocketChannel, socketPath)));
