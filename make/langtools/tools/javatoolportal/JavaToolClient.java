@@ -30,6 +30,7 @@ import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,7 +40,7 @@ record JavaToolClient(Configuration configuration) {
         ensurePortalIsRunning();
 
         var portfile = configuration.portfile();
-        if (Files.notExists(portfile)) throw new AssertionError("Port file not found: " + portfile);
+        if (Files.notExists(portfile)) throw new AssertionError("[JavaToolClient] Port file not found: " + portfile);
         var port = Integer.parseInt(Files.readString(portfile));
 
         var out = System.out;
@@ -50,7 +51,7 @@ record JavaToolClient(Configuration configuration) {
 
         try (var channel = SocketChannel.open()) {
             var connected = channel.connect(socketAddress);
-            if (!connected) throw new RuntimeException("Connect failed: " + socketAddress);
+            if (!connected) throw new RuntimeException("[JavaToolClient] Connect failed: " + socketAddress);
             // Send arguments
             SocketChannelSupport.writeStrings(channel, List.of(configuration.args()));
             // Read status code
@@ -75,12 +76,21 @@ record JavaToolClient(Configuration configuration) {
             command.add(configuration.arg0());
             var builder = new ProcessBuilder(command).inheritIO();
             var process = builder.start();
-            System.out.println("Starting Java Tool Portal...");
-            Thread.sleep(1234);
-            System.out.println(process.info());
+            System.out.println("[JavaToolClient] Starting Java Tool Portal... " + process.info());
+            pollForFileBeingCreated(portfile);
+            Files.delete(starting);
         } catch (FileAlreadyExistsException exception) {
-            System.out.println("Waiting for Java Tool Portal coming up...");
-            Thread.sleep(1234);
+            System.out.println("[JavaToolClient] Waiting for Java Tool Portal coming up...");
+            pollForFileBeingCreated(portfile);
+        }
+    }
+
+    void pollForFileBeingCreated(Path file) throws Exception {
+        var counter = 0;
+        while (Files.notExists(file)) {
+            Thread.sleep(333);
+            counter++;
+            if (counter > 10) throw new java.io.FileNotFoundException(file.toString());
         }
     }
 }

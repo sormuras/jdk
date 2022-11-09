@@ -51,7 +51,7 @@ class JavaToolPortal {
     }
 
     public int run(PrintWriter out, PrintWriter err, String... args) {
-        out.println("Portal started in directory: " + Path.of("").toAbsolutePath());
+        out.println("[JavaToolPortal] Run in directory: " + Path.of("").toAbsolutePath());
         if (args.length != 1) {
             err.println("Usage: JavaToolPortal SOCKET-PATH");
             return 1;
@@ -63,12 +63,10 @@ class JavaToolPortal {
             try {
                 var server = new Server(out, err, socketAddress);
                 var serverSocketChannel = server.bind();
-                Files.writeString(socketPath, "" + serverSocketChannel.socket().getLocalPort());
-                Files.deleteIfExists(socketPath.resolveSibling("server.port.starting"));
-                out.println("Portal bound to: " + serverSocketChannel.socket());
+                out.println("[JavaToolPortal] Server bound to: " + serverSocketChannel.socket());
                 new Thread(new Stopper(serverSocketChannel, socketPath.getParent())).start();
-                Runtime.getRuntime()
-                        .addShutdownHook(new Thread(new Closer(serverSocketChannel, socketPath)));
+                Runtime.getRuntime().addShutdownHook(new Thread(new Closer(serverSocketChannel, socketPath)));
+                Files.writeString(socketPath, "" + serverSocketChannel.socket().getLocalPort());
                 server.serve(serverSocketChannel); // accept pending and future connections
                 return 0;
             } catch (BindException exception) {
@@ -151,7 +149,7 @@ class JavaToolPortal {
             } catch (AsynchronousCloseException exception) {
                 // fall-through
             }
-            out.printf("Portal closed after handling %d request(s)%n", counter);
+            out.printf("[JavaToolPortal] Closed after serving %d tool call(s)%n", counter);
         }
     }
 
@@ -163,15 +161,13 @@ class JavaToolPortal {
                 // Read arguments
                 var arguments = new ArrayDeque<>(SocketChannelSupport.readStrings(channel));
 
-                // Run tool
-                var tool = arguments.removeFirst();
+                // Find tool by name
+                var name = arguments.removeFirst();
+                var tool = ToolProvider.findFirst(name).orElseThrow(() -> new IllegalArgumentException("No such tool: " + name));
                 var args = arguments.toArray(String[]::new);
                 var normal = new StringWriter();
-                var errors = new StringWriter();
-                var code =
-                        ToolProvider.findFirst(tool)
-                                .orElseThrow()
-                                .run(new PrintWriter(normal, true), new PrintWriter(errors, true), args);
+                var errors = new StringWriter();                
+                var code = tool.run(new PrintWriter(normal, true), new PrintWriter(errors, true), args);
 
                 // Write status code and output streams
                 SocketChannelSupport.writeInt(channel, code); // 4
