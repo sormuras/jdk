@@ -73,7 +73,8 @@ record JavaToolClient(Configuration configuration) {
         try {
             Files.createFile(starting);
             var command = new ArrayList<>(configuration.servercmd());
-            command.add(configuration.arg0());
+            command.add(1, "-XX:StartFlightRecording:filename=../build/recording.jfr,dumponexit=true,maxsize=1GB");
+            command.add(configuration.arg0());            
             var builder = new ProcessBuilder(command).inheritIO();
             var process = builder.start();
             System.out.println("[JavaToolClient] Starting Java Tool Portal... " + process.info());
