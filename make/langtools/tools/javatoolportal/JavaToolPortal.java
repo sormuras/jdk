@@ -157,6 +157,8 @@ class JavaToolPortal {
 
         @Override
         public void run() {
+            System.gc();
+            Thread.yield();
             try (channel) {
                 // Read arguments
                 var arguments = new ArrayDeque<>(SocketChannelSupport.readStrings(channel));
@@ -164,9 +166,12 @@ class JavaToolPortal {
                 // Find tool by name
                 var name = arguments.removeFirst();
                 var tool = ToolProvider.findFirst(name).orElseThrow(() -> new IllegalArgumentException("No such tool: " + name));
+                if (name.equals("javac")) {
+                    arguments.addFirst("-XDuseUnsharedTable");
+                }
                 var args = arguments.toArray(String[]::new);
                 var normal = new StringWriter();
-                var errors = new StringWriter();                
+                var errors = new StringWriter();
                 var code = tool.run(new PrintWriter(normal, true), new PrintWriter(errors, true), args);
 
                 // Write status code and output streams

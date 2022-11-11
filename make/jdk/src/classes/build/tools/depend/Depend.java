@@ -248,7 +248,7 @@ public class Depend implements Plugin {
                 }
             };
             ((JavacTask) systemCompiler.getTask(null, fm, null,
-                                                List.of("-proc:only", "-XDaccessInternalAPI=true"),
+                                                List.of("-proc:only", "-XDaccessInternalAPI=true", "-XDuseUnsharedTable"),
                                                 List.of("java.lang.Object"), null))
                                        .analyze();
         } catch (IOException ex) {
