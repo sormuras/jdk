@@ -133,7 +133,6 @@ class JavaToolPortal {
         void serve(ServerSocketChannel serverSocketChannel) throws Exception {
             int counter = 0;
             int timeouts = 0;
-            var current = new TreeSet<Thread>();
             try {
                 serverSocketChannel.socket().setSoTimeout(6 * 1000);
                 while (serverSocketChannel.isOpen()) {
