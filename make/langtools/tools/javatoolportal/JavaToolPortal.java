@@ -133,17 +133,20 @@ class JavaToolPortal {
         void serve(ServerSocketChannel serverSocketChannel) throws Exception {
             int counter = 0;
             int timeouts = 0;
+            var current = new TreeSet<Thread>();
             try {
-                serverSocketChannel.socket().setSoTimeout(60 * 1000);
+                serverSocketChannel.socket().setSoTimeout(6 * 1000);
                 while (serverSocketChannel.isOpen()) {
                     try {
-                        var channel = serverSocketChannel.accept();
+                        var channel = serverSocketChannel.socket().accept().getChannel();
                         counter++;
                         timeouts = 0;
+                        out.printf("[JavaToolPortal] counter=%d, timeouts = %d%n", counter, timeouts);
                         new Thread(new Handler(out, err, channel)).start();
                     } catch (SocketTimeoutException timeout) {
                         timeouts++;
-                        if (timeouts >= 3) serverSocketChannel.close();
+                        out.printf("[JavaToolPortal] timeouts = %d%n", timeouts);
+                        if (timeouts >= 20) serverSocketChannel.close(); // max idle time = 120 seconds
                     }
                 }
             } catch (AsynchronousCloseException exception) {
