@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,6 +37,11 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.io.UncheckedIOException;
+import java.lang.module.ModuleDescriptor;
+import java.lang.module.ModuleFinder;
+import java.lang.module.ModuleReader;
+import java.lang.module.ModuleReference;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -45,6 +50,7 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLStreamHandler;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -63,9 +69,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.ResourceBundle;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
-import javax.lang.model.SourceVersion;
 import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.TypeElement;
 import javax.tools.FileObject;
@@ -198,8 +209,9 @@ public class Main {
     public void run(String[] runtimeArgs, String[] args) throws Fault, InvocationTargetException {
         Path file = getFile(args);
 
-        Context context = new Context(file.toAbsolutePath());
-        String mainClassName = compile(file, getJavacOpts(runtimeArgs), context);
+        var opts = getJavacOpts(runtimeArgs);
+        Context context = new Context(file.toAbsolutePath(), opts, this);
+        String mainClassName = compile(file, opts, context);
 
         String[] appArgs = Arrays.copyOfRange(args, 1, args.length);
         execute(mainClassName, appArgs, context);
@@ -275,12 +287,6 @@ public class Main {
                     @Override
                     public CharSequence getCharContent(boolean ignoreEncodingErrors) {
                         return sb;
-                    }
-                    @Override
-                    public boolean isNameCompatible(String simpleName, JavaFileObject.Kind kind) {
-                        // reject package-info and module-info; accept other names
-                        return (kind == JavaFileObject.Kind.SOURCE)
-                                && SourceVersion.isIdentifier(simpleName);
                     }
                     @Override
                     public String toString() {
@@ -364,12 +370,39 @@ public class Main {
 
         // add implicit options
         javacOpts.add("-proc:none");
+        javacOpts.add("-implicit:none"); // idea "-implicit:limit=10" // Jon: initial ":class", then none
+        javacOpts.add("-Xprefer:source");
         javacOpts.add("-Xdiags:verbose");
         javacOpts.add("-Xlint:deprecation");
         javacOpts.add("-Xlint:unchecked");
         javacOpts.add("-Xlint:-options");
         javacOpts.add("-XDsourceLauncher");
         return javacOpts;
+    }
+
+    // "package p.q;" as Path.of("p", "q")
+    private static Path getPackageNameAsPath(Path file) {
+        try {
+            // TODO Use "JavacTask.parse()"
+            Pattern pattern = Pattern.compile("package\\s+([\\w.]*?)\\s*;");
+            Matcher matcher = pattern.matcher(Files.readString(file));
+            if (matcher.find()) return Path.of(matcher.group(1).replace('.', '/'));
+            return Path.of("");
+        } catch (IOException exception) {
+            throw new UncheckedIOException(exception);
+        }
+    }
+
+    private static Path getRootDirectory(Path file) {
+        Path packageNameAsPath = getPackageNameAsPath(file);
+        Path directory = file.getParent();
+        if (directory.endsWith(packageNameAsPath)) {
+            for (int i = 0; i < packageNameAsPath.getNameCount(); i++) {
+                directory = directory.getParent();
+                if (directory == null) throw new AssertionError("name count too high?!");
+            }
+        }
+        return directory;
     }
 
     /**
@@ -384,18 +417,25 @@ public class Main {
      * @throws Fault if any compilation errors occur, or if no class was found
      */
     private String compile(Path file, List<String> javacOpts, Context context) throws Fault {
-        JavaFileObject fo = readFile(file);
+        List<JavaFileObject> compilationUnits = new ArrayList<>();
 
         JavacTool javaCompiler = JavacTool.create();
         StandardJavaFileManager stdFileMgr = javaCompiler.getStandardFileManager(null, null, null);
         try {
-            stdFileMgr.setLocation(StandardLocation.SOURCE_PATH, Collections.emptyList());
+            stdFileMgr.setLocationFromPaths(StandardLocation.SOURCE_PATH, List.of(context.root));
+            if (context.inMemoryClasses.isEmpty()) {
+                var module = context.root.resolve("module-info.java");
+                if (Files.exists(module)) {
+                    compilationUnits.add(stdFileMgr.getJavaFileObjects(module).iterator().next());
+                }
+            }
+            compilationUnits.add(stdFileMgr.getJavaFileObjects(file).iterator().next());
         } catch (IOException e) {
             throw new java.lang.Error("unexpected exception from file manager", e);
         }
         JavaFileManager fm = context.getFileManager(stdFileMgr);
-        JavacTask t = javaCompiler.getTask(out, fm, null, javacOpts, null, List.of(fo));
-        MainClassListener l = new MainClassListener(t);
+        JavacTask t = javaCompiler.getTask(out, fm, null, javacOpts, null, compilationUnits);
+        MainClassListener l = new MainClassListener(t, file);
         Boolean ok = t.call();
         if (!ok) {
             throw new Fault(Errors.CompilationFailed);
@@ -420,9 +460,9 @@ public class Main {
     private void execute(String mainClassName, String[] appArgs, Context context)
             throws Fault, InvocationTargetException {
         System.setProperty("jdk.launcher.sourcefile", context.file.toString());
-        ClassLoader cl = context.getClassLoader(ClassLoader.getSystemClassLoader());
+        ClassLoader parentLoader = ClassLoader.getSystemClassLoader();
         try {
-            Class<?> appClass = Class.forName(mainClassName, true, cl);
+            Class<?> appClass = context.loadMainClass(parentLoader, mainClassName);
             Method main = appClass.getDeclaredMethod("main", String[].class);
             int PUBLIC_STATIC = Modifier.PUBLIC | Modifier.STATIC;
             if ((main.getModifiers() & PUBLIC_STATIC) != PUBLIC_STATIC) {
@@ -480,9 +520,11 @@ public class Main {
      */
     static class MainClassListener implements TaskListener {
         TypeElement mainClass;
+        final URI uri;
 
-        MainClassListener(JavacTask t) {
+        MainClassListener(JavacTask t, Path file) {
             t.addTaskListener(this);
+            uri = file.toUri();
         }
 
         @Override
@@ -490,7 +532,9 @@ public class Main {
             if (ev.getKind() == TaskEvent.Kind.ANALYZE && mainClass == null) {
                 TypeElement te = ev.getTypeElement();
                 if (te.getNestingKind() == NestingKind.TOP_LEVEL) {
-                    mainClass = te;
+                    JavaFileObject source = ev.getSourceFile();
+                    if (source == null) return;
+                    if (source.toUri().equals(uri)) mainClass = te;
                 }
             }
         }
@@ -503,18 +547,106 @@ public class Main {
      */
     private static class Context {
         private final Path file;
+        private final Path root;
+        private final List<String> opts;
+        private final Main main;
         private final Map<String, byte[]> inMemoryClasses = new HashMap<>();
 
-        Context(Path file) {
+        Context(Path file, List<String> opts, Main main) {
             this.file = file;
+            this.opts = opts;
+            this.main = main;
+            this.root = getRootDirectory(file);
         }
 
         JavaFileManager getFileManager(StandardJavaFileManager delegate) {
             return new MemoryFileManager(inMemoryClasses, delegate);
         }
 
-        ClassLoader getClassLoader(ClassLoader parent) {
-            return new MemoryClassLoader(inMemoryClasses, parent, file);
+        Class<?> loadMainClass(ClassLoader parent, String mainClassName) throws ClassNotFoundException, Fault {
+            var memoryClassLoader = new MemoryClassLoader(inMemoryClasses, parent, this);
+            var moduleInfoBytes = inMemoryClasses.get("module-info");
+            if (moduleInfoBytes == null) {
+                return Class.forName(mainClassName, true, memoryClassLoader);
+            }
+
+            var lastDotInMainClassName = mainClassName.lastIndexOf('.');
+            if (lastDotInMainClassName == -1) {
+                throw main.new Fault(Errors.UnnamedPkgNotAllowedNamedModules);
+            }
+            var mainClassNamePackageName = mainClassName.substring(0, lastDotInMainClassName);
+
+            var packageNames = new TreeSet<String>();
+            try (var stream = Files.find(root, 99, (p, a) -> Files.isDirectory(p))) {
+                var directories = stream.toList();
+                for (var directory : directories) {
+                    var packageName = root.relativize(directory).toString()
+                            .replace('/', '.')
+                            .replace('\\', '.');
+                    if (packageName.isEmpty()) continue;
+                    packageNames.add(packageName);
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            var descriptor = ModuleDescriptor.read(ByteBuffer.wrap(moduleInfoBytes), () -> packageNames);
+            var moduleName = descriptor.name();
+
+            var finder = new MemoryModuleFinder(inMemoryClasses, descriptor);
+            var boot = ModuleLayer.boot();
+            var configuration = boot.configuration().resolve(finder, ModuleFinder.of(), Set.of(moduleName));
+            var controller = ModuleLayer.defineModules(configuration, List.of(boot), mn -> memoryClassLoader);
+            var layer = controller.layer();
+
+
+            var module = layer.findModule(moduleName).orElseThrow();
+            controller.addOpens(module, mainClassNamePackageName, getClass().getModule());
+
+            return layer.findLoader(moduleName).loadClass(mainClassName);
+        }
+    }
+
+    private record MemoryModuleFinder(Map<String, byte[]> classes, ModuleDescriptor descriptor) implements ModuleFinder {
+        @Override
+        public Optional<ModuleReference> find(String name) {
+            if (name.equals(descriptor.name())) {
+                return Optional.of(new MemoryModuleReference());
+            }
+            return Optional.empty();
+        }
+
+        @Override
+        public Set<ModuleReference> findAll() {
+            return Set.of(new MemoryModuleReference());
+        }
+
+        class MemoryModuleReference extends ModuleReference {
+            protected MemoryModuleReference() {
+                super(descriptor, URI.create("memory:///" + descriptor.toNameAndVersion()));
+            }
+
+            @Override
+            public ModuleReader open() {
+                return new MemoryModuleReader();
+            }
+        }
+
+        class MemoryModuleReader implements ModuleReader {
+            @Override
+            public Optional<URI> find(String name) {
+                return classes.keySet().stream()
+                        .filter(key -> key.equals(name))
+                        .map(key -> URI.create("memory:///" + name.replace('.', '/') + ".class"))
+                        .findFirst();
+            }
+
+            @Override
+            public Stream<String> list() {
+                return classes.keySet().stream();
+            }
+
+            @Override
+            public void close() {}
         }
     }
 
@@ -569,6 +701,9 @@ public class Main {
      * as any like-named classes that might be found on the application class path.)
      */
     private static class MemoryClassLoader extends ClassLoader {
+        /** Compilation context. */
+        private final Context context;
+
         /**
          * The map of all classes found in the source file, indexed by
          * {@link ClassLoader#name binary name}.
@@ -581,9 +716,11 @@ public class Main {
          */
         private final ProtectionDomain domain;
 
-        MemoryClassLoader(Map<String, byte[]> sourceFileClasses, ClassLoader parent, Path file) {
+        MemoryClassLoader(Map<String, byte[]> sourceFileClasses, ClassLoader parent, Context context) {
             super(parent);
             this.sourceFileClasses = sourceFileClasses;
+            this.context = context;
+            Path file = context.file;
             CodeSource codeSource;
             try {
                 codeSource = new CodeSource(file.toUri().toURL(), (CodeSigner[]) null);
@@ -610,9 +747,8 @@ public class Main {
             synchronized (getClassLoadingLock(name)) {
                 Class<?> c = findLoadedClass(name);
                 if (c == null) {
-                    if (sourceFileClasses.containsKey(name)) {
-                        c = findClass(name);
-                    } else {
+                    c = findOrCompileClass(name);
+                    if (c == null) {
                         c = getParent().loadClass(name);
                     }
                     if (resolve) {
@@ -670,9 +806,29 @@ public class Main {
 
         @Override
         protected Class<?> findClass(String name) throws ClassNotFoundException {
+            var foundOrCompiledClass = findOrCompileClass(name);
+            if (foundOrCompiledClass == null) {
+                throw new ClassNotFoundException(name);
+            }
+            return foundOrCompiledClass;
+        }
+
+        protected Class<?> findOrCompileClass(String name) throws ClassNotFoundException {
             byte[] bytes = sourceFileClasses.get(name);
             if (bytes == null) {
-                throw new ClassNotFoundException(name);
+                var path = name.replace('.', '/') + ".java";
+                var file = context.root.resolve(path);
+                if (Files.exists(file)) {
+                    try {
+                        context.main.compile(file, context.opts, context);
+                        bytes = sourceFileClasses.get(name);
+                    } catch (Fault fault) {
+                        throw new ClassNotFoundException(name, fault);
+                    }
+                }
+                if (bytes == null) {
+                    return null;
+                }
             }
             return defineClass(name, bytes, 0, bytes.length, domain);
         }
