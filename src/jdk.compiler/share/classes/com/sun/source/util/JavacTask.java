@@ -189,6 +189,12 @@ public abstract class JavacTask implements CompilationTask {
      */
     public abstract Types getTypes();
 
+    /**
+     * {@return the option name of the lint category or null if none is
+     * available or the category is hidden}
+     *
+     * @since 22
+     */
     public String getLintCategory(Diagnostic<?> diagnostic) {
         if (diagnostic instanceof JCDiagnostic jcd) {
             if (jcd.hasLintCategory()) {
