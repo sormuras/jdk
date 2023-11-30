@@ -153,7 +153,7 @@ public abstract class JavacTask implements CompilationTask {
      * Setting a new {@code ParameterNameProvider} will clear any previously set
      * {@code ParameterNameProvider}, which won't be queried any more.
      *
-     * When no {@code ParameterNameProvider} is set, or when it returns null from
+     * When no {@code ParameterNameProvider} is set, or when it returns {@code null} from
      * {@link ParameterNameProvider#getParameterName(javax.lang.model.element.VariableElement)},
      * an automatically synthesized name is returned from {@code VariableElement.getSimpleName()}.
      *
@@ -190,16 +190,15 @@ public abstract class JavacTask implements CompilationTask {
     public abstract Types getTypes();
 
     /**
-     * {@return the option name of the lint category or null if none is
-     * available or the category is hidden}
+     * {@return the option name of the lint category or {@code null} if none is available}
      *
+     * @param diagnostic the diagnostic object to inspect
      * @since 22
      */
     public String getLintCategory(Diagnostic<?> diagnostic) {
         if (diagnostic instanceof JCDiagnostic jcd) {
             if (jcd.hasLintCategory()) {
-                var category = jcd.getLintCategory();
-                return category.hidden ? null : category.option;
+                return jcd.getLintCategory().option;
             }
         }
         return null;
