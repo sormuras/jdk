@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2011, 2023, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, 2024, Oracle and/or its affiliates. All rights reserved.
 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 #
 # This code is free software; you can redistribute it and/or modify it
@@ -491,7 +491,7 @@ AC_DEFUN_ONCE([JDKOPT_SETUP_UNDEFINED_BEHAVIOR_SANITIZER],
 [
   # GCC reports lots of likely false positives for stringop-truncation and format-overflow.
   # Silence them for now.
-  UBSAN_CHECKS="-fsanitize=undefined -fsanitize=float-divide-by-zero -fno-sanitize=shift-base"
+  UBSAN_CHECKS="-fsanitize=undefined -fsanitize=float-divide-by-zero -fno-sanitize=shift-base -fno-sanitize=alignment"
   UBSAN_CFLAGS="$UBSAN_CHECKS -Wno-stringop-truncation -Wno-format-overflow -fno-omit-frame-pointer -DUNDEFINED_BEHAVIOR_SANITIZER"
   UBSAN_LDFLAGS="$UBSAN_CHECKS"
   UTIL_ARG_ENABLE(NAME: ubsan, DEFAULT: false, RESULT: UBSAN_ENABLED,
@@ -822,6 +822,9 @@ AC_DEFUN([JDKOPT_CHECK_CODESIGN_PARAMS],
   $RM "$CODESIGN_TESTFILE"
   $TOUCH "$CODESIGN_TESTFILE"
   CODESIGN_SUCCESS=false
+
+  $ECHO "check codesign, calling $CODESIGN $PARAMS $CODESIGN_TESTFILE" >&AS_MESSAGE_LOG_FD
+
   eval \"$CODESIGN\" $PARAMS \"$CODESIGN_TESTFILE\" 2>&AS_MESSAGE_LOG_FD \
       >&AS_MESSAGE_LOG_FD && CODESIGN_SUCCESS=true
   $RM "$CODESIGN_TESTFILE"
@@ -846,7 +849,7 @@ AC_DEFUN([JDKOPT_CHECK_CODESIGN_DEBUG],
 
 AC_DEFUN([JDKOPT_SETUP_MACOSX_SIGNING],
 [
-  ENABLE_CODESIGN=false
+  MACOSX_CODESIGN_MODE=disabled
   if test "x$OPENJDK_TARGET_OS" = "xmacosx" && test "x$CODESIGN" != "x"; then
 
     UTIL_ARG_WITH(NAME: macosx-codesign, TYPE: literal, OPTIONAL: true,
@@ -856,7 +859,6 @@ AC_DEFUN([JDKOPT_SETUP_MACOSX_SIGNING],
         DESC: [set the macosx code signing mode (hardened, debug, auto)]
     )
 
-    MACOSX_CODESIGN_MODE=disabled
     if test "x$MACOSX_CODESIGN_ENABLED" = "xtrue"; then
 
       # Check for user provided code signing identity.
@@ -899,7 +901,26 @@ AC_DEFUN([JDKOPT_SETUP_MACOSX_SIGNING],
         AC_MSG_ERROR([unknown value for --with-macosx-codesign: $MACOSX_CODESIGN])
       fi
     fi
-    AC_SUBST(MACOSX_CODESIGN_IDENTITY)
-    AC_SUBST(MACOSX_CODESIGN_MODE)
   fi
+  AC_SUBST(MACOSX_CODESIGN_IDENTITY)
+  AC_SUBST(MACOSX_CODESIGN_MODE)
+])
+
+################################################################################
+#
+# fallback linker
+#
+AC_DEFUN_ONCE([JDKOPT_SETUP_FALLBACK_LINKER],
+[
+  FALLBACK_LINKER_DEFAULT=false
+
+  if HOTSPOT_CHECK_JVM_VARIANT(zero); then
+    FALLBACK_LINKER_DEFAULT=true
+  fi
+
+  UTIL_ARG_ENABLE(NAME: fallback-linker, DEFAULT: $FALLBACK_LINKER_DEFAULT,
+      RESULT: ENABLE_FALLBACK_LINKER,
+      DESC: [enable libffi-based fallback implementation of java.lang.foreign.Linker],
+      CHECKING_MSG: [if fallback linker enabled])
+  AC_SUBST(ENABLE_FALLBACK_LINKER)
 ])

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -24,6 +24,8 @@
  */
 package java.lang.constant;
 
+import sun.invoke.util.Wrapper;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -36,6 +38,7 @@ import static java.util.Objects.requireNonNull;
 class ConstantUtils {
     /** an empty constant descriptor */
     public static final ConstantDesc[] EMPTY_CONSTANTDESC = new ConstantDesc[0];
+    static final ClassDesc[] EMPTY_CLASSDESC = new ClassDesc[0];
     static final Constable[] EMPTY_CONSTABLE = new Constable[0];
     static final int MAX_ARRAY_TYPE_DESC_DIMENSIONS = 255;
 
@@ -76,6 +79,66 @@ class ConstantUtils {
      }
 
     /**
+     * Validates the correctness of a binary package name.
+     * In particular checks for the presence of invalid characters in the name.
+     * Empty package name is allowed.
+     *
+     * @param name the package name
+     * @return the package name passed if valid
+     * @throws IllegalArgumentException if the package name is invalid
+     * @throws NullPointerException if the package name is {@code null}
+     */
+    public static String validateBinaryPackageName(String name) {
+        for (int i=0; i<name.length(); i++) {
+            char ch = name.charAt(i);
+            if (ch == ';' || ch == '[' || ch == '/')
+                throw new IllegalArgumentException("Invalid package name: " + name);
+        }
+        return name;
+    }
+
+    /**
+     * Validates the correctness of an internal package name.
+     * In particular checks for the presence of invalid characters in the name.
+     * Empty package name is allowed.
+     *
+     * @param name the package name
+     * @return the package name passed if valid
+     * @throws IllegalArgumentException if the package name is invalid
+     * @throws NullPointerException if the package name is {@code null}
+     */
+    public static String validateInternalPackageName(String name) {
+        for (int i=0; i<name.length(); i++) {
+            char ch = name.charAt(i);
+            if (ch == ';' || ch == '[' || ch == '.')
+                throw new IllegalArgumentException("Invalid package name: " + name);
+        }
+        return name;
+    }
+
+    /**
+     * Validates the correctness of a module name.
+     * In particular checks for the presence of invalid characters in the name.
+     * Empty module name is allowed.
+     *
+     * {@jvms 4.2.3} Module and Package Names
+     *
+     * @param name the module name
+     * @return the module name passed if valid
+     * @throws IllegalArgumentException if the module name is invalid
+     * @throws NullPointerException if the module name is {@code null}
+     */
+    public static String validateModuleName(String name) {
+        for (int i=name.length() - 1; i >= 0; i--) {
+            char ch = name.charAt(i);
+            if ((ch >= '\u0000' && ch <= '\u001F')
+            || ((ch == '\\' || ch == ':' || ch =='@') && (i == 0 || name.charAt(--i) != '\\')))
+                throw new IllegalArgumentException("Invalid module name: " + name);
+        }
+        return name;
+    }
+
+    /**
      * Validates a member name
      *
      * @param name the name of the member
@@ -83,7 +146,6 @@ class ConstantUtils {
      * @throws IllegalArgumentException if the member name is invalid
      */
     public static String validateMemberName(String name, boolean method) {
-        requireNonNull(name);
         if (name.length() == 0)
             throw new IllegalArgumentException("zero-length member name");
         for (int i=0; i<name.length(); i++) {
@@ -134,10 +196,10 @@ class ConstantUtils {
      * @return the list of types
      * @throws IllegalArgumentException if the descriptor string is not valid
      */
-    static List<String> parseMethodDescriptor(String descriptor) {
+    static List<ClassDesc> parseMethodDescriptor(String descriptor) {
         int cur = 0, end = descriptor.length();
-        ArrayList<String> ptypes = new ArrayList<>();
-        ptypes.add(null); //placeholder for return type
+        ArrayList<ClassDesc> ptypes = new ArrayList<>();
+        ptypes.add(null); // placeholder for return type
 
         if (cur >= end || descriptor.charAt(cur) != '(')
             throw new IllegalArgumentException("Bad method descriptor: " + descriptor);
@@ -147,7 +209,7 @@ class ConstantUtils {
             int len = skipOverFieldSignature(descriptor, cur, end, false);
             if (len == 0)
                 throw new IllegalArgumentException("Bad method descriptor: " + descriptor);
-            ptypes.add(descriptor.substring(cur, cur + len));
+            ptypes.add(resolveClassDesc(descriptor, cur, len));
             cur += len;
         }
         if (cur >= end)
@@ -157,8 +219,15 @@ class ConstantUtils {
         int rLen = skipOverFieldSignature(descriptor, cur, end, true);
         if (rLen == 0 || cur + rLen != end)
             throw new IllegalArgumentException("Bad method descriptor: " + descriptor);
-        ptypes.set(0, descriptor.substring(cur, cur + rLen));
+        ptypes.set(0, resolveClassDesc(descriptor, cur, rLen));
         return ptypes;
+    }
+
+    private static ClassDesc resolveClassDesc(String descriptor, int start, int len) {
+        if (len == 1) {
+            return Wrapper.forPrimitiveType(descriptor.charAt(start)).classDescriptor();
+        }
+        return ClassDesc.ofDescriptor(descriptor.substring(start, start + len));
     }
 
     private static final char JVM_SIGNATURE_ARRAY = '[';
@@ -193,7 +262,7 @@ class ConstantUtils {
         int index = start;
         while (index < end) {
             switch (descriptor.charAt(index)) {
-                case JVM_SIGNATURE_VOID: if (!voidOK) { return index; }
+                case JVM_SIGNATURE_VOID: if (!voidOK) { return 0; }
                 case JVM_SIGNATURE_BOOLEAN:
                 case JVM_SIGNATURE_BYTE:
                 case JVM_SIGNATURE_CHAR:

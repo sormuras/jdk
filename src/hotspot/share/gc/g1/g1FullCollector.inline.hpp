@@ -28,7 +28,7 @@
 #include "gc/g1/g1FullCollector.hpp"
 
 #include "gc/g1/g1FullGCHeapRegionAttr.hpp"
-#include "gc/g1/heapRegion.inline.hpp"
+#include "gc/g1/g1HeapRegion.inline.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "runtime/atomic.hpp"
 
@@ -38,10 +38,6 @@ bool G1FullCollector::is_compacting(oop obj) const {
 
 bool G1FullCollector::is_skip_compacting(uint region_index) const {
   return _region_attr_table.is_skip_compacting(region_index);
-}
-
-bool G1FullCollector::is_skip_marking(oop obj) const {
-  return _region_attr_table.is_skip_marking(cast_from_oop<HeapWord*>(obj));
 }
 
 bool G1FullCollector::is_compaction_target(uint region_index) const {
@@ -103,4 +99,3 @@ GrowableArrayCHeap<HeapRegion*, mtGC>& G1FullCollector::humongous_compaction_reg
 }
 
 #endif // SHARE_GC_G1_G1FULLCOLLECTOR_INLINE_HPP
-

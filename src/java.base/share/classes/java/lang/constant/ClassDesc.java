@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -24,6 +24,7 @@
  */
 package java.lang.constant;
 
+import java.lang.invoke.MethodHandles;
 import java.lang.invoke.TypeDescriptor;
 import java.util.stream.Stream;
 
@@ -149,7 +150,7 @@ public sealed interface ClassDesc
      * @param descriptor a field descriptor string
      * @return a {@linkplain ClassDesc} describing the desired class
      * @throws NullPointerException if the argument is {@code null}
-     * @throws IllegalArgumentException if the name string is not in the
+     * @throws IllegalArgumentException if the descriptor string is not in the
      * correct format
      * @jvms 4.3.2 Field Descriptors
      * @jvms 4.4.1 The CONSTANT_Class_info Structure
@@ -157,19 +158,10 @@ public sealed interface ClassDesc
      * @see ClassDesc#ofInternalName(String)
      */
     static ClassDesc ofDescriptor(String descriptor) {
-        requireNonNull(descriptor);
-        if (descriptor.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "not a valid reference type descriptor: " + descriptor);
-        }
-        int depth = ConstantUtils.arrayDepth(descriptor);
-        if (depth > ConstantUtils.MAX_ARRAY_TYPE_DESC_DIMENSIONS) {
-            throw new IllegalArgumentException(
-                    "Cannot create an array type descriptor with more than " +
-                    ConstantUtils.MAX_ARRAY_TYPE_DESC_DIMENSIONS + " dimensions");
-        }
+        // implicit null-check
         return (descriptor.length() == 1)
-               ? new PrimitiveClassDescImpl(descriptor)
+               ? Wrapper.forPrimitiveType(descriptor.charAt(0)).classDescriptor()
+               // will throw IAE on descriptor.length == 0 or if array dimensions too long
                : new ReferenceClassDescImpl(descriptor);
     }
 
@@ -278,7 +270,7 @@ public sealed interface ClassDesc
      * @return whether this {@linkplain ClassDesc} describes an array type
      */
     default boolean isArray() {
-        return descriptorString().startsWith("[");
+        return descriptorString().charAt(0) == '[';
     }
 
     /**
@@ -296,7 +288,7 @@ public sealed interface ClassDesc
      * @return whether this {@linkplain ClassDesc} describes a class or interface type
      */
     default boolean isClassOrInterface() {
-        return descriptorString().startsWith("L");
+        return descriptorString().charAt(0) == 'L';
     }
 
     /**
@@ -361,6 +353,9 @@ public sealed interface ClassDesc
      * @jvms 4.3.2 Field Descriptors
      */
     String descriptorString();
+
+    @Override
+    Class<?> resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException;
 
     /**
      * Compare the specified object with this descriptor for equality.  Returns

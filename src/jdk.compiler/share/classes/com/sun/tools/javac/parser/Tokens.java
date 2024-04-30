@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -152,6 +152,7 @@ public class Tokens {
         DOUBLELITERAL(Tag.NUMERIC),
         CHARLITERAL(Tag.NUMERIC),
         STRINGLITERAL(Tag.STRING),
+        STRINGFRAGMENT(Tag.STRING),
         TRUE("true", Tag.NAMED),
         FALSE("false", Tag.NAMED),
         NULL("null", Tag.NAMED),
@@ -273,12 +274,13 @@ public class Tokens {
     public interface Comment {
 
         enum CommentStyle {
-            LINE,
-            BLOCK,
-            JAVADOC,
+            LINE,       // Starting with //
+            BLOCK,      // starting with /*
+            JAVADOC,    // starting with /**
         }
 
         String getText();
+        JCDiagnostic.DiagnosticPosition getPos();
         int getSourcePos(int index);
         CommentStyle getStyle();
         boolean isDeprecated();
@@ -357,7 +359,7 @@ public class Tokens {
          * Preserve classic semantics - if multiple javadocs are found on the token
          * the last one is returned
          */
-        public Comment comment(Comment.CommentStyle style) {
+        public Comment docComment() {
             List<Comment> comments = getComments(Comment.CommentStyle.JAVADOC);
             return comments.isEmpty() ?
                     null :

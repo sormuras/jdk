@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -219,6 +219,11 @@ public class DocTreeMaker implements DocTreeFactory {
             }
 
             @Override
+            public JCDiagnostic.DiagnosticPosition getPos() {
+                return null;
+            }
+
+            @Override
             public int getSourcePos(int index) {
                 return Position.NOPOS;
             }
@@ -311,7 +316,12 @@ public class DocTreeMaker implements DocTreeFactory {
 
     @Override @DefinedBy(Api.COMPILER_TREE)
     public DCInheritDoc newInheritDocTree() {
-        DCInheritDoc tree = new DCInheritDoc();
+        return newInheritDocTree(null);
+    }
+
+    @Override @DefinedBy(Api.COMPILER_TREE)
+    public DCInheritDoc newInheritDocTree(ReferenceTree supertype) {
+        DCInheritDoc tree = new DCInheritDoc((DCReference) supertype);
         tree.pos = pos;
         return tree;
     }

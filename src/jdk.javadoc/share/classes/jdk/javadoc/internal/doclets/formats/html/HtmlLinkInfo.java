@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -35,7 +35,6 @@ import jdk.javadoc.internal.doclets.formats.html.markup.ContentBuilder;
 import jdk.javadoc.internal.doclets.formats.html.markup.HtmlStyle;
 import jdk.javadoc.internal.doclets.formats.html.markup.Text;
 import jdk.javadoc.internal.doclets.toolkit.BaseConfiguration;
-import jdk.javadoc.internal.doclets.toolkit.Content;
 import jdk.javadoc.internal.doclets.toolkit.util.Utils;
 
 
@@ -77,7 +76,7 @@ public class HtmlLinkInfo {
         /**
          * Link with optional type parameters and bounds rendered as separate links.
          */
-        LINK_TYPE_PARAMS_AND_BOUNDS;
+        LINK_TYPE_PARAMS_AND_BOUNDS
     }
 
     private final HtmlConfiguration configuration;
@@ -86,7 +85,7 @@ public class HtmlLinkInfo {
     private Kind context = Kind.PLAIN;
 
     // The fragment of the link.
-    private String fragment = "";
+    private String fragment = null;
 
     // The member this link points to (if any).
     private Element targetMember;
@@ -122,8 +121,11 @@ public class HtmlLinkInfo {
     // True iff the preview flags should be skipped for this link.
     private boolean skipPreview;
 
-    // True if type parameters should be separated by line breaks.
+    // True if type parameters should be separated by hard line breaks.
     private boolean addLineBreaksInTypeParameters = false;
+
+    // True if additional <wbr> tags should be added to type parameters
+    private boolean addLineBreakOpportunitiesInTypeParameters = false;
 
     // True if annotations on type parameters should be shown.
     private boolean showTypeParameterAnnotations = false;
@@ -309,6 +311,23 @@ public class HtmlLinkInfo {
      */
     public boolean addLineBreaksInTypeParameters() {
         return addLineBreaksInTypeParameters;
+    }
+
+    /**
+     * Sets the addLineBreakOpportunitiesInTypeParameters flag for this link.
+     * @param addLineBreakOpportunities the new value
+     * @return this object
+     */
+    public HtmlLinkInfo addLineBreakOpportunitiesInTypeParameters(boolean addLineBreakOpportunities) {
+        this.addLineBreakOpportunitiesInTypeParameters = addLineBreakOpportunities;
+        return this;
+    }
+
+    /**
+     * {@return true if line break opportunities should be added to type parameters}
+     */
+    public boolean addLineBreakOpportunitiesInTypeParameters() {
+        return addLineBreakOpportunitiesInTypeParameters;
     }
 
     /**
