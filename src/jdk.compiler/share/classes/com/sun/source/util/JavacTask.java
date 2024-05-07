@@ -40,6 +40,7 @@ import javax.tools.JavaFileObject;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.api.BasicJavacTask;
+import com.sun.tools.javac.api.ClientCodeWrapper.DiagnosticSourceUnwrapper;
 import com.sun.tools.javac.processing.JavacProcessingEnvironment;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.JCDiagnostic;
@@ -196,6 +197,9 @@ public abstract class JavacTask implements CompilationTask {
      * @since 23
      */
     public String getLintCategory(Diagnostic<?> diagnostic) {
+        if (diagnostic instanceof DiagnosticSourceUnwrapper unwrapper) {
+            diagnostic = unwrapper.d;
+        }
         if (diagnostic instanceof JCDiagnostic jcd) {
             if (jcd.hasLintCategory()) {
                 return jcd.getLintCategory().option;
