@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -33,6 +33,7 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import javax.tools.Diagnostic;
 import javax.tools.JavaCompiler.CompilationTask;
 import javax.tools.JavaFileObject;
 
@@ -41,6 +42,7 @@ import com.sun.source.tree.Tree;
 import com.sun.tools.javac.api.BasicJavacTask;
 import com.sun.tools.javac.processing.JavacProcessingEnvironment;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.JCDiagnostic;
 
 /**
  * Provides access to functionality specific to the JDK Java Compiler, javac.
@@ -186,4 +188,19 @@ public abstract class JavacTask implements CompilationTask {
      * @return the utility object for dealing with type mirrors
      */
     public abstract Types getTypes();
+
+    /**
+     * {@return the option name of the lint category or {@code null} if none is available}
+     *
+     * @param diagnostic the diagnostic object to inspect
+     * @since 23
+     */
+    public String getLintCategory(Diagnostic<?> diagnostic) {
+        if (diagnostic instanceof JCDiagnostic jcd) {
+            if (jcd.hasLintCategory()) {
+                return jcd.getLintCategory().option;
+            }
+        }
+        return null;
+    }
 }
