@@ -45,8 +45,8 @@ runs:
     - name: 'Checkout the JTReg source'
       uses: actions/checkout@v4
       with:
-        repository: openjdk/jtreg
-        ref: jtreg-${{ steps.version.outputs.value }}
+        repository: lmesnik/jtreg
+        ref: 7902847
         path: jtreg/src
       if: (steps.get-cached.outputs.cache-hit != 'true')
 
