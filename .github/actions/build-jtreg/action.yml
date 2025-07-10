@@ -46,9 +46,9 @@ runs:
       uses: actions/checkout@v4
       with:
         repository: openjdk/jtreg
-        ref: jtreg-${{ steps.version.outputs.value }}
+        ref: HEAD
         path: jtreg/src
-      if: (steps.get-cached.outputs.cache-hit != 'true')
+#      if: (steps.get-cached.outputs.cache-hit != 'true')
 
     - name: 'Build JTReg'
       run: |
@@ -58,7 +58,7 @@ runs:
         mv build/images/jtreg/* ../installed
       working-directory: jtreg/src
       shell: bash
-      if: (steps.get-cached.outputs.cache-hit != 'true')
+#      if: (steps.get-cached.outputs.cache-hit != 'true')
 
     - name: 'Upload JTReg artifact'
       uses: actions/upload-artifact@v4
