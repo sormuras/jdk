@@ -96,7 +96,7 @@ public class Versions {
         System.out.printf("minorVersion=%s%n",minorVersion);
 
         // Look in ".", and *not* in CLASSPATH
-        cl = new URLClassLoader(new URL[]{new File("./").toURL()}, null);
+        cl = new URLClassLoader(new URL[]{new File("./").toURI().toURL()}, null);
 
         checkClassVersion(majorVersion    , minorVersion    , true );
         checkClassVersion(majorVersion + 1, minorVersion    , false);
