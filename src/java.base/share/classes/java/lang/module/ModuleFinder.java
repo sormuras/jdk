@@ -311,6 +311,28 @@ public interface ModuleFinder {
         return compose(List.of(finders));
     }
 
+    /**
+     * Returns a module finder that is composed from a sequence of zero or more
+     * module finders. The {@link #find(String) find} method of the resulting
+     * module finder will locate a module by invoking the {@code find} method
+     * of each module finder, in list index order, until either the module is
+     * found or all module finders have been searched. The {@link #findAll()
+     * findAll} method of the resulting module finder will return a set of
+     * modules that includes all modules located by the first module finder.
+     * The set of modules will include all modules located by the second or
+     * subsequent module finder that are not located by previous module finders
+     * in the sequence.
+     *
+     * <p> When locating modules then any exceptions or errors thrown by the
+     * {@code find} or {@code findAll} methods of the underlying module finders
+     * will be propagated to the caller of the resulting module finder's
+     * {@code find} or {@code findAll} methods. </p>
+     *
+     * @param finders
+     *        The list of module finders
+     *
+     * @return A {@code ModuleFinder} that composes a sequence of module finders
+     */
     static ModuleFinder compose(List<ModuleFinder> finders) {
         // copy the list and check for nulls
         final List<ModuleFinder> finderList = List.copyOf(finders);
