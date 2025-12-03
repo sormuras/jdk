@@ -308,8 +308,12 @@ public interface ModuleFinder {
      * @return A {@code ModuleFinder} that composes a sequence of module finders
      */
     static ModuleFinder compose(ModuleFinder... finders) {
+        return compose(List.of(finders));
+    }
+
+    static ModuleFinder compose(List<ModuleFinder> finders) {
         // copy the list and check for nulls
-        final List<ModuleFinder> finderList = List.of(finders);
+        final List<ModuleFinder> finderList = List.copyOf(finders);
 
         return new ModuleFinder() {
             private final Map<String, ModuleReference> nameToModule = new HashMap<>();

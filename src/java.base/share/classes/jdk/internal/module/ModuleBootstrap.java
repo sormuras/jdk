@@ -622,9 +622,22 @@ public final class ModuleBootstrap {
         } else {
             String[] dirs = s.split(File.pathSeparator);
             Path[] paths = new Path[dirs.length];
+            List<Path> files = new ArrayList<>();
             int i = 0;
             for (String dir: dirs) {
                 paths[i++] = Path.of(dir);
+                Path file = Path.of(dir, ".modules.properties");
+                if (Files.exists(file)) {
+                    files.add(file);
+                }
+            }
+            if (!files.isEmpty()) {
+                List<ModuleFinder> finders = new ArrayList<>(files.size() + 1);
+                for (Path file : files) {
+                    finders.add(new ExternalModuleFinder(file));
+                }
+                finders.add(ModulePath.of(patcher, paths));
+                return ModuleFinder.compose(finders);
             }
             return ModulePath.of(patcher, paths);
         }
