@@ -46,7 +46,7 @@ runs:
       uses: actions/checkout@v4
       with:
         repository: openjdk/jtreg
-        ref: jtreg-${{ steps.version.outputs.value }}
+        ref: 137539ea585670557d5590b0fd7a0cf795cbc67a
         path: jtreg/src
       if: (steps.get-cached.outputs.cache-hit != 'true')
 
