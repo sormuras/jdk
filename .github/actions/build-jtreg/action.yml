@@ -46,7 +46,7 @@ runs:
       uses: actions/checkout@v4
       with:
         repository: openjdk/jtreg
-        ref: a3b1279cfbe954537e99b45f9c9647b99b9b7f85
+        ref: 98a1016f8bb6ee23eed1d33d72b240ec848617de
         path: jtreg/src
       if: (steps.get-cached.outputs.cache-hit != 'true')
 
