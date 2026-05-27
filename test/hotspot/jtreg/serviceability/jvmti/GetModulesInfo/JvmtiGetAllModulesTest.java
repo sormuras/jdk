@@ -26,7 +26,7 @@
  * @summary Verifies the JVMTI GetAllModules API
  * @requires vm.jvmti
  * @library /test/lib
- * @run main/othervm/native -agentlib:JvmtiGetAllModulesTest JvmtiGetAllModulesTest
+ * @run main/othervm/native --enable-native-access=java.base -agentlib:JvmtiGetAllModulesTest JvmtiGetAllModulesTest
  *
  */
 import java.lang.module.ModuleReference;
