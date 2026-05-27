@@ -26,7 +26,7 @@
  * @summary Verifies the JVMTI GetAllModules API
  * @requires vm.jvmti
  * @library /test/lib
- * @run main/othervm/native --enable-native-access=java.base -agentlib:JvmtiGetAllModulesTest JvmtiGetAllModulesTest
+ * @run main/othervm/native -agentlib:JvmtiGetAllModulesTest JvmtiGetAllModulesTest
  *
  */
 import java.lang.module.ModuleReference;
@@ -69,6 +69,10 @@ public class JvmtiGetAllModulesTest {
         // remove the unnamed modules here, so the resulting report can be expected
         // to be equal to what Java reports
         modules.removeIf(mod -> !mod.isNamed());
+
+        // jdk.proxy1 and jdk.proxy2 modules are dynamically initialized by Graal code in case Graal VM is used.
+        // We need to filter them out because they are not part of boot modules. See more details in JDK-8195156.
+        modules.removeIf(mod -> mod.getName().startsWith("jdk.proxy"));
 
         return modules;
     }
