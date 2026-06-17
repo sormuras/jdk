@@ -70,10 +70,6 @@ public class JvmtiGetAllModulesTest {
         // to be equal to what Java reports
         modules.removeIf(mod -> !mod.isNamed());
 
-        // jdk.proxy1 and jdk.proxy2 modules are dynamically initialized by Graal code in case Graal VM is used.
-        // We need to filter them out because they are not part of boot modules. See more details in JDK-8195156.
-        modules.removeIf(mod -> mod.getName().startsWith("jdk.proxy"));
-
         return modules;
     }
 
